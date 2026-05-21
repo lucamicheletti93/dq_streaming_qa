@@ -1,0 +1,17 @@
+
+input:
+    output_dir_name: "/Users/lucamicheletti/cernbox/DQ_streaming/train_678568"
+    alien_run_list: /Users/lucamicheletti/GITHUB/dq_run3_analyses/utils/alien_run_list.txt
+    alien_input_path: /Users/lucamicheletti/GITHUB/dq_run3_analyses/utils/alien_input_path.txt
+
+    file_type: "AnalysisResults.root"
+    file_path: "/Users/lucamicheletti/cernbox/DQ_streaming/train_678568"
+    table_maker_stat: table-maker/Statistics
+    table_maker: table-maker/output
+    table_maker_dir: ["Muons_muonQualityCuts"]
+    table_maker_obj: ["Pt"]
+
+output:
+    output_fig_name: figures_1/LHC22o_full_stat
+    output_dir_name: output_1/Data
+    output_file_name: LHC22q_apass3_muons.root
