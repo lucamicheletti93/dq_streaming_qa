@@ -1,9 +1,43 @@
-void SetLegend(TLegend *);
-void SetHist(TH1D *hist, Color_t color, int size) {
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <filesystem>
+#include <algorithm>
+#include <string>
+
+#include <TFile.h>
+#include <TDirectoryFile.h>
+#include <TTree.h>
+#include <TTreeReader.h>
+#include <TLorentzVector.h>
+#include <TLegend.h>
+#include <THnSparse.h>
+#include <TCanvas.h>
+#include <TLine.h>
+#include <TLatex.h>
+#include <TStyle.h>
+#include <TGrid.h>
+#include <TH1.h>
+#include <TH2.h>
+#include <TF1.h>
+#include <TRandom3.h>
+
+using namespace std;
+
+void SetLegend(TLegend *legend){
+    legend->SetBorderSize(0);
+    legend->SetFillColor(10);
+    legend->SetFillStyle(1);
+    legend->SetLineStyle(0);
+    legend->SetLineColor(0);
+    legend->SetTextFont(42);
+    legend->SetTextSize(0.045);
+}
+void SetHist(TH1D *hist, Color_t color, int size, double alpha = 1) {
     hist->SetMarkerStyle(size);
-    hist->SetMarkerColor(color);
+    hist->SetMarkerColorAlpha(color, alpha);
     hist->SetMarkerSize(0.5);
-    hist->SetLineColor(color);
+    hist->SetLineColorAlpha(color, alpha);
     hist->Scale(1./hist->Integral());
 }
 TCanvas* DoPlot(TH1D *hist, string canvasName, string varName) {
@@ -88,11 +122,16 @@ TCanvas* DoRatioPlot(TH1D *histSum, std::vector<TH1D*> hist, string canvasName, 
     return canvas;
 }
 
-void streaming_qa(string process = "table-maker") {
+// process: table-maker / table-reader
+// production: minBias / skimmed / heavyIon
+
+void streaming_qa(string train = "686270", string process = "table-maker", string production = "minBias") {
     gStyle->SetPalette(kRainBow);
-    string pathIn = "/Users/lucamicheletti/cernbox/DQ_streaming/train_678568";
+    string pathIn = Form("/Users/lucamicheletti/cernbox/DQ_streaming/train_%s", train.c_str());
     string muonCutTm = "muonMinimalCuts10SigmaPDCA";
     string muonCutTr = "muonQualityCutsMUONStandalone";
+    string histBlock = "Mass_Pt_centrFT0C_V2";
+    string triggerMask = "fSingleMuLow";
 
     TH1D *hSumVtxZ, *hSumCentFT0C, *hSumCentFT0M;
     TH2D *hSumPsi2A_CentFT0C, *hSumPsi2B_CentFT0C, *hSumPsi2C_CentFT0C;
@@ -107,14 +146,22 @@ void streaming_qa(string process = "table-maker") {
         std::cout << nRuns << std::endl;
 
         int iRun = 0;
-
-        TH2D *hCountersVsRuns = new TH2D("hCountersVsRuns", ";Run;Counter", nRuns, 0, nRuns, 6, 0, 6);
+        int nClasses = production == "skimmed" ? 11 : 6; // 9 = skimmed, 6 = minBias
+        
+        TH2D *hCountersVsRuns = new TH2D("hCountersVsRuns", ";Run;Counter", nRuns, 0, nRuns, nClasses, 0, nClasses);
         hCountersVsRuns->GetYaxis()->SetBinLabel(1, "BCs TVX");
         hCountersVsRuns->GetYaxis()->SetBinLabel(2, "BCs TVX after BC cuts");
         hCountersVsRuns->GetYaxis()->SetBinLabel(3, "Collisions All");
         hCountersVsRuns->GetYaxis()->SetBinLabel(4, "Collisions TVX");
         hCountersVsRuns->GetYaxis()->SetBinLabel(5, "Collisions Acc");
         hCountersVsRuns->GetYaxis()->SetBinLabel(6, "Collisions after cuts");
+        if (production == "skimmed") {
+            hCountersVsRuns->GetYaxis()->SetBinLabel(7, "inspected TVX");
+            hCountersVsRuns->GetYaxis()->SetBinLabel(8, Form("%s scalers", triggerMask.c_str()));
+            hCountersVsRuns->GetYaxis()->SetBinLabel(9, Form("%s selections", triggerMask.c_str()));
+            hCountersVsRuns->GetYaxis()->SetBinLabel(10, Form("%s AnalysedTriggers", triggerMask.c_str()));
+            hCountersVsRuns->GetYaxis()->SetBinLabel(11, Form("%s", triggerMask.c_str()));
+        }
 
         std::vector<TH1D*> hVtxZ(nRuns);
         std::vector<TH1D*> hCentFT0C(nRuns);
@@ -129,6 +176,8 @@ void streaming_qa(string process = "table-maker") {
         std::vector<TH1D*> hRAtAbsorberEnd(nRuns);
         std::vector<TH1D*> hChi2MCHMID(nRuns);
         std::vector<TH1D*> hChi2MCHMFT(nRuns);
+
+        TH2D *hZorroInfo, *hZorroSel; // Histograms for skimmed datasets
         for (auto run : runList) {
             std::cout << "-------- Processing run " << run << " --------" << std::endl;
             TFile *fIn = new TFile(Form("%s/%d/AnalysisResults.root", pathIn.c_str(), run));
@@ -138,6 +187,12 @@ void streaming_qa(string process = "table-maker") {
             TH1D *hColCounterAll = (TH1D*) fIn->Get("eventselection-run3/eventselection/hColCounterAll");
             TH1D *hColCounterTVX = (TH1D*) fIn->Get("eventselection-run3/eventselection/hColCounterTVX");
             TH1D *hColCounterAcc = (TH1D*) fIn->Get("eventselection-run3/eventselection/hColCounterAcc");
+
+            if (production == "skimmed") {
+                TList *hlistZorro = (TList*) fIn->Get("table-maker/Statistics");
+                hZorroInfo = (TH2D*) hlistZorro->FindObject("ZorroInfo");
+                hZorroSel = (TH2D*) hlistZorro->FindObject("ZorroSel");
+            }
 
             TList *hlistTm = (TList*) fIn->Get("table-maker/output");
             TList *listTmEvents = (TList*) hlistTm->FindObject("Event_AfterCuts");
@@ -154,6 +209,14 @@ void streaming_qa(string process = "table-maker") {
             hCountersVsRuns->SetBinContent(iRun+1, 4, hColCounterTVX->GetEntries());
             hCountersVsRuns->SetBinContent(iRun+1, 5, hColCounterAcc->GetEntries());
             hCountersVsRuns->SetBinContent(iRun+1, 6, hVtxZ[iRun]->GetEntries());
+            if (production == "skimmed") {
+                hCountersVsRuns->SetBinContent(iRun+1, 7, hZorroInfo -> GetBinContent(1, hZorroInfo -> GetYaxis() -> FindBin("inspected TVX")));
+                hCountersVsRuns->SetBinContent(iRun+1, 8, hZorroInfo -> GetBinContent(1, hZorroInfo -> GetYaxis() -> FindBin(Form("%s scalers", triggerMask.c_str()))));
+                hCountersVsRuns->SetBinContent(iRun+1, 9, hZorroInfo -> GetBinContent(1, hZorroInfo -> GetYaxis() -> FindBin(Form("%s selections", triggerMask.c_str()))));
+                hCountersVsRuns->SetBinContent(iRun+1, 10, hZorroSel -> GetBinContent(1, hZorroSel -> GetYaxis() -> FindBin(Form("%s AnalysedTriggers", triggerMask.c_str()))));
+                hCountersVsRuns->SetBinContent(iRun+1, 11, hZorroSel -> GetBinContent(1, hZorroSel -> GetYaxis() -> FindBin(triggerMask.c_str())));
+            }
+
             hCountersVsRuns->GetXaxis()->SetBinLabel(iRun+1, Form("%d", run));
 
             TList *listTmMuons = (TList*) hlistTm->FindObject(Form("Muons_%s", muonCutTm.c_str()));
@@ -169,9 +232,11 @@ void streaming_qa(string process = "table-maker") {
                 hSumVtxZ = (TH1D*) hVtxZ[iRun]->Clone("hSumVtxZ");
                 hSumCentFT0C = (TH1D*) hCentFT0C[iRun]->Clone("hSumCentFT0C");
                 hSumCentFT0M = (TH1D*) hCentFT0M[iRun]->Clone("hSumCentFT0M");
-                hSumPsi2A_CentFT0C = (TH2D*) hPsi2A_CentFT0C[iRun]->Clone("hSumPsi2A_CentFT0C");
-                hSumPsi2B_CentFT0C = (TH2D*) hPsi2B_CentFT0C[iRun]->Clone("hSumPsi2B_CentFT0C");
-                hSumPsi2C_CentFT0C = (TH2D*) hPsi2C_CentFT0C[iRun]->Clone("hSumPsi2C_CentFT0C");
+                if (production == "heavyIon") {
+                    hSumPsi2A_CentFT0C = (TH2D*) hPsi2A_CentFT0C[iRun]->Clone("hSumPsi2A_CentFT0C");
+                    hSumPsi2B_CentFT0C = (TH2D*) hPsi2B_CentFT0C[iRun]->Clone("hSumPsi2B_CentFT0C");
+                    hSumPsi2C_CentFT0C = (TH2D*) hPsi2C_CentFT0C[iRun]->Clone("hSumPsi2C_CentFT0C");
+                }
                 hSumPt = (TH1D*) hPt[iRun]->Clone("hSumPt");
                 hSumEta = (TH1D*) hEta[iRun]->Clone("hSumEta");
                 hSumPhi = (TH1D*) hPhi[iRun]->Clone("hSumPhi");
@@ -183,9 +248,11 @@ void streaming_qa(string process = "table-maker") {
                 hSumVtxZ->Add(hVtxZ[iRun]);
                 hSumCentFT0C->Add(hCentFT0C[iRun]);
                 hSumCentFT0M->Add(hCentFT0M[iRun]);
-                hSumPsi2A_CentFT0C->Add(hPsi2A_CentFT0C[iRun]);
-                hSumPsi2B_CentFT0C->Add(hPsi2B_CentFT0C[iRun]);
-                hSumPsi2C_CentFT0C->Add(hPsi2C_CentFT0C[iRun]);
+                if (production == "heavyIon") {
+                    hSumPsi2A_CentFT0C->Add(hPsi2A_CentFT0C[iRun]);
+                    hSumPsi2B_CentFT0C->Add(hPsi2B_CentFT0C[iRun]);
+                    hSumPsi2C_CentFT0C->Add(hPsi2C_CentFT0C[iRun]);
+                }
                 hSumPt->Add(hPt[iRun]);
                 hSumEta->Add(hEta[iRun]);
                 hSumPhi->Add(hPhi[iRun]);
@@ -198,9 +265,11 @@ void streaming_qa(string process = "table-maker") {
             hVtxZ[iRun]->SetTitle(Form("%d", run));
             hCentFT0C[iRun]->SetTitle(Form("%d", run));
             hCentFT0M[iRun]->SetTitle(Form("%d", run));
-            hPsi2A_CentFT0C[iRun]->SetTitle(Form("%d", run));
-            hPsi2B_CentFT0C[iRun]->SetTitle(Form("%d", run));
-            hPsi2C_CentFT0C[iRun]->SetTitle(Form("%d", run));
+            if (production == "heavyIon") {
+                hPsi2A_CentFT0C[iRun]->SetTitle(Form("%d", run));
+                hPsi2B_CentFT0C[iRun]->SetTitle(Form("%d", run));
+                hPsi2C_CentFT0C[iRun]->SetTitle(Form("%d", run));
+            }
             hPt[iRun]->SetTitle(Form("%d", run));
             hEta[iRun]->SetTitle(Form("%d", run));
             hPhi[iRun]->SetTitle(Form("%d", run));
@@ -214,64 +283,69 @@ void streaming_qa(string process = "table-maker") {
 
         TCanvas *canvasNormalization = new TCanvas("canvasNormalization", "", 800, 600);
         gStyle->SetOptStat(false);
-        hCountersVsRuns->Draw("COLZ");
+        hCountersVsRuns->Draw("COLZ TEXT");
 
         TCanvas *canvasVtxZ = DoRatioPlot(hSumVtxZ, hVtxZ, "canvasVtxZ", "vtx_{Z} (cm)");
         TCanvas *canvasCentFT0C = DoRatioPlot(hSumCentFT0C, hCentFT0C, "canvasCentFT0C", "Centr FT0C (%)");
         TCanvas *canvasCentFT0M = DoRatioPlot(hSumCentFT0M, hCentFT0M, "canvasCentFT0M", "Centr FT0M (%)");
 
         // Rebin EP distribution
-        hSumPsi2A_CentFT0C->RebinX(5);
-        hSumPsi2B_CentFT0C->RebinX(5);
-        hSumPsi2C_CentFT0C->RebinX(5);
-        for (int iRun = 0;iRun < nRuns;iRun++) {
-            hPsi2A_CentFT0C[iRun]->RebinX(5);
-            hPsi2B_CentFT0C[iRun]->RebinX(5);
-            hPsi2C_CentFT0C[iRun]->RebinX(5);
-        }
-
-        TCanvas *canvasPsi2A_CentFT0C = new TCanvas("canvasPsi2A_CentFT0C", "", 1800, 1800);
-        canvasPsi2A_CentFT0C->Divide(3, 3);
-
-        for (int iCent = 0;iCent < 9;iCent++) {
-            canvasPsi2A_CentFT0C->cd(iCent+1);
-            TH1D *hTmpSumPsi2A_CentFT0C = (TH1D*) hSumPsi2A_CentFT0C->ProjectionY(Form("hTmpSumPsi2A_CentFT0C_%d_%d", iRun, iCent), iCent+1, iCent+1);
-            SetHist(hTmpSumPsi2A_CentFT0C, kBlack, 20);
-            hTmpSumPsi2A_CentFT0C->Draw("EP");
+        TCanvas *canvasPsi2A_CentFT0C = nullptr;
+        TCanvas *canvasPsi2B_CentFT0C = nullptr;
+        TCanvas *canvasPsi2C_CentFT0C = nullptr;
+        if (production == "heavyIon") {
+            hSumPsi2A_CentFT0C->RebinX(5);
+            hSumPsi2B_CentFT0C->RebinX(5);
+            hSumPsi2C_CentFT0C->RebinX(5);
             for (int iRun = 0;iRun < nRuns;iRun++) {
-                TH1D *hTmpPsi2A_CentFT0C = (TH1D*) hPsi2A_CentFT0C[iRun]->ProjectionY(Form("hTmpPsi2A_CentFT0C_%d_%d", iRun, iCent), iCent+1, iCent+1);
-                hTmpPsi2A_CentFT0C->Scale(1./hTmpPsi2A_CentFT0C->Integral());
-                hTmpPsi2A_CentFT0C->Draw("SAME PLC PMC");
+                hPsi2A_CentFT0C[iRun]->RebinX(5);
+                hPsi2B_CentFT0C[iRun]->RebinX(5);
+                hPsi2C_CentFT0C[iRun]->RebinX(5);
             }
-        }
 
-        TCanvas *canvasPsi2B_CentFT0C = new TCanvas("canvasPsi2B_CentFT0C", "", 1800, 1800);
-        canvasPsi2B_CentFT0C->Divide(3, 3);
+            canvasPsi2A_CentFT0C = new TCanvas("canvasPsi2A_CentFT0C", "", 1800, 1800);
+            canvasPsi2A_CentFT0C->Divide(3, 3);
 
-        for (int iCent = 0;iCent < 9;iCent++) {
-            canvasPsi2B_CentFT0C->cd(iCent+1);
-            TH1D *hTmpSumPsi2B_CentFT0C = (TH1D*) hSumPsi2B_CentFT0C->ProjectionY(Form("hTmpSumPsi2B_CentFT0C_%d_%d", iRun, iCent), iCent+1, iCent+1);
-            SetHist(hTmpSumPsi2B_CentFT0C, kBlack, 20);
-            hTmpSumPsi2B_CentFT0C->Draw("EP");
-            for (int iRun = 0;iRun < nRuns;iRun++) {
-                TH1D *hTmpPsi2B_CentFT0C = (TH1D*) hPsi2B_CentFT0C[iRun]->ProjectionY(Form("hTmpPsi2B_CentFT0C_%d_%d", iRun, iCent), iCent+1, iCent+1);
-                hTmpPsi2B_CentFT0C->Scale(1./hTmpPsi2B_CentFT0C->Integral());
-                hTmpPsi2B_CentFT0C->Draw("SAME PLC PMC");
+            for (int iCentr = 0;iCentr < 9;iCentr++) {
+                canvasPsi2A_CentFT0C->cd(iCentr+1);
+                TH1D *hTmpSumPsi2A_CentFT0C = (TH1D*) hSumPsi2A_CentFT0C->ProjectionY(Form("hTmpSumPsi2A_CentFT0C_%d_%d", iRun, iCentr), iCentr+1, iCentr+1);
+                SetHist(hTmpSumPsi2A_CentFT0C, kBlack, 20);
+                hTmpSumPsi2A_CentFT0C->Draw("EP");
+                for (int iRun = 0;iRun < nRuns;iRun++) {
+                    TH1D *hTmpPsi2A_CentFT0C = (TH1D*) hPsi2A_CentFT0C[iRun]->ProjectionY(Form("hTmpPsi2A_CentFT0C_%d_%d", iRun, iCentr), iCentr+1, iCentr+1);
+                    hTmpPsi2A_CentFT0C->Scale(1./hTmpPsi2A_CentFT0C->Integral());
+                    hTmpPsi2A_CentFT0C->Draw("SAME PLC PMC");
+                }
             }
-        }
 
-        TCanvas *canvasPsi2C_CentFT0C = new TCanvas("canvasPsi2C_CentFT0C", "", 1800, 1800);
-        canvasPsi2C_CentFT0C->Divide(3, 3);
+            canvasPsi2B_CentFT0C = new TCanvas("canvasPsi2B_CentFT0C", "", 1800, 1800);
+            canvasPsi2B_CentFT0C->Divide(3, 3);
 
-        for (int iCent = 0;iCent < 9;iCent++) {
-            canvasPsi2C_CentFT0C->cd(iCent+1);
-            TH1D *hTmpSumPsi2C_CentFT0C = (TH1D*) hSumPsi2C_CentFT0C->ProjectionY(Form("hTmpSumPsi2C_CentFT0C_%d_%d", iRun, iCent), iCent+1, iCent+1);
-            SetHist(hTmpSumPsi2C_CentFT0C, kBlack, 20);
-            hTmpSumPsi2C_CentFT0C->Draw("EP");
-            for (int iRun = 0;iRun < nRuns;iRun++) {
-                TH1D *hTmpPsi2C_CentFT0C = (TH1D*) hPsi2C_CentFT0C[iRun]->ProjectionY(Form("hTmpPsi2C_CentFT0C_%d_%d", iRun, iCent), iCent+1, iCent+1);
-                hTmpPsi2C_CentFT0C->Scale(1./hTmpPsi2C_CentFT0C->Integral());
-                hTmpPsi2C_CentFT0C->Draw("SAME PLC PMC");
+            for (int iCentr = 0;iCentr < 9;iCentr++) {
+                canvasPsi2B_CentFT0C->cd(iCentr+1);
+                TH1D *hTmpSumPsi2B_CentFT0C = (TH1D*) hSumPsi2B_CentFT0C->ProjectionY(Form("hTmpSumPsi2B_CentFT0C_%d_%d", iRun, iCentr), iCentr+1, iCentr+1);
+                SetHist(hTmpSumPsi2B_CentFT0C, kBlack, 20);
+                hTmpSumPsi2B_CentFT0C->Draw("EP");
+                for (int iRun = 0;iRun < nRuns;iRun++) {
+                    TH1D *hTmpPsi2B_CentFT0C = (TH1D*) hPsi2B_CentFT0C[iRun]->ProjectionY(Form("hTmpPsi2B_CentFT0C_%d_%d", iRun, iCentr), iCentr+1, iCentr+1);
+                    hTmpPsi2B_CentFT0C->Scale(1./hTmpPsi2B_CentFT0C->Integral());
+                    hTmpPsi2B_CentFT0C->Draw("SAME PLC PMC");
+                }
+            }
+
+            canvasPsi2C_CentFT0C = new TCanvas("canvasPsi2C_CentFT0C", "", 1800, 1800);
+            canvasPsi2C_CentFT0C->Divide(3, 3);
+
+            for (int iCentr = 0;iCentr < 9;iCentr++) {
+                canvasPsi2C_CentFT0C->cd(iCentr+1);
+                TH1D *hTmpSumPsi2C_CentFT0C = (TH1D*) hSumPsi2C_CentFT0C->ProjectionY(Form("hTmpSumPsi2C_CentFT0C_%d_%d", iRun, iCentr), iCentr+1, iCentr+1);
+                SetHist(hTmpSumPsi2C_CentFT0C, kBlack, 20);
+                hTmpSumPsi2C_CentFT0C->Draw("EP");
+                for (int iRun = 0;iRun < nRuns;iRun++) {
+                    TH1D *hTmpPsi2C_CentFT0C = (TH1D*) hPsi2C_CentFT0C[iRun]->ProjectionY(Form("hTmpPsi2C_CentFT0C_%d_%d", iRun, iCentr), iCentr+1, iCentr+1);
+                    hTmpPsi2C_CentFT0C->Scale(1./hTmpPsi2C_CentFT0C->Integral());
+                    hTmpPsi2C_CentFT0C->Draw("SAME PLC PMC");
+                }
             }
         }
 
@@ -286,7 +360,7 @@ void streaming_qa(string process = "table-maker") {
         canvasVtxZ->SaveAs(Form("%s/figures/VtxZ.pdf", pathIn.c_str()));
         canvasCentFT0C->SaveAs(Form("%s/figures/CentFT0C.pdf", pathIn.c_str()));
         canvasCentFT0M->SaveAs(Form("%s/figures/CentFT0M.pdf", pathIn.c_str()));
-        canvasPsi2A_CentFT0C->SaveAs(Form("%s/figures/Psi2A_CentFT0C.pdf", pathIn.c_str()));
+        if (production == "heavyIon") {canvasPsi2A_CentFT0C->SaveAs(Form("%s/figures/Psi2A_CentFT0C.pdf", pathIn.c_str()));}
         canvasPt->SaveAs(Form("%s/figures/Pt.pdf", pathIn.c_str()));
         canvasEta->SaveAs(Form("%s/figures/Eta.pdf", pathIn.c_str()));
         canvasPhi->SaveAs(Form("%s/figures/Phi.pdf", pathIn.c_str()));
@@ -301,9 +375,11 @@ void streaming_qa(string process = "table-maker") {
         canvasVtxZ->Write();
         canvasCentFT0C->Write();
         canvasCentFT0M->Write();
-        canvasPsi2A_CentFT0C->Write();
-        canvasPsi2B_CentFT0C->Write();
-        canvasPsi2C_CentFT0C->Write();
+        if (production == "heavyIon") {
+            canvasPsi2A_CentFT0C->Write();
+            canvasPsi2B_CentFT0C->Write();
+            canvasPsi2C_CentFT0C->Write();
+        }
         canvasPt->Write();
         canvasEta->Write();
         canvasPhi->Write();
@@ -339,11 +415,10 @@ void streaming_qa(string process = "table-maker") {
 
         TList *hlistTrDimuons = (TList*) fIn->Get("analysis-same-event-pairing/output");
         TList *listTrDimuons = (TList*) hlistTrDimuons->FindObject(Form("PairsMuonSEPM_%s", muonCutTr.c_str()));
-        THnSparseD *hSparseDimuon = (THnSparseD*) listTrDimuons -> FindObject("Mass_Pt_Cent_Rap");
+        THnSparseD *hSparseDimuon = (THnSparseD*) listTrDimuons -> FindObject(histBlock.c_str());
         hSparseDimuon -> GetAxis(1) -> SetRangeUser(0., 20.);
         hSparseDimuon -> GetAxis(3) -> SetRangeUser(2.5, 4);
         TH1D *hDimuonMass = (TH1D*) hSparseDimuon -> Projection(0, "hDimuonMass");
-
         TH1D *hCounters = new TH1D("hCounters", ";Run;Counter", 2, 0, 2);
         hCounters->GetXaxis()->SetBinLabel(1, "Collisions before cuts");
         hCounters->GetXaxis()->SetBinLabel(2, "Collisions after cuts");
@@ -356,39 +431,80 @@ void streaming_qa(string process = "table-maker") {
 
 
         // Rebin EP distribution
+        int minCentrs[] = {0, 10, 20, 30, 40, 50, 60, 70, 80};
+        int maxCentrs[] = {10, 20, 30, 40, 50, 60, 70, 80, 90};
+
         hSumPsi2A_CentFT0C->RebinX(5);
         hSumPsi2B_CentFT0C->RebinX(5);
         hSumPsi2C_CentFT0C->RebinX(5);
 
+        std::vector<TH1D*> hPsi2As_CentFT0C(9);
+        std::vector<TH1D*> hPsi2Bs_CentFT0C(9);
+        std::vector<TH1D*> hPsi2Cs_CentFT0C(9);
+
         TCanvas *canvasPsi2A_CentFT0C = new TCanvas("canvasPsi2A_CentFT0C", "", 1800, 1800);
         canvasPsi2A_CentFT0C->Divide(3, 3);
 
-        for (int iCent = 0;iCent < 9;iCent++) {
-            canvasPsi2A_CentFT0C->cd(iCent+1);
-            TH1D *hTmpSumPsi2A_CentFT0C = (TH1D*) hSumPsi2A_CentFT0C->ProjectionY(Form("hTmpSumPsi2A_CentFT0C_%d", iCent), iCent+1, iCent+1);
+        for (int iCentr = 0;iCentr < 9;iCentr++) {
+            canvasPsi2A_CentFT0C->cd(iCentr+1);
+            TH1D *hTmpSumPsi2A_CentFT0C = (TH1D*) hSumPsi2A_CentFT0C->ProjectionY(Form("hTmpSumPsi2A_CentFT0C_%d", iCentr), iCentr+1, iCentr+1);
             SetHist(hTmpSumPsi2A_CentFT0C, kBlack, 20);
+            hPsi2As_CentFT0C[iCentr] = (TH1D*) hTmpSumPsi2A_CentFT0C->Clone(Form("hPsi2As_CentFT0C_%d_%d", minCentrs[iCentr], maxCentrs[iCentr]));
+            SetHist(hPsi2As_CentFT0C[iCentr], kRed+1, 20);
             hTmpSumPsi2A_CentFT0C->Draw("EP");
         }
 
         TCanvas *canvasPsi2B_CentFT0C = new TCanvas("canvasPsi2B_CentFT0C", "", 1800, 1800);
         canvasPsi2B_CentFT0C->Divide(3, 3);
 
-        for (int iCent = 0;iCent < 9;iCent++) {
-            canvasPsi2B_CentFT0C->cd(iCent+1);
-            TH1D *hTmpSumPsi2B_CentFT0C = (TH1D*) hSumPsi2B_CentFT0C->ProjectionY(Form("hTmpSumPsi2B_CentFT0C_%d", iCent), iCent+1, iCent+1);
+        for (int iCentr = 0;iCentr < 9;iCentr++) {
+            canvasPsi2B_CentFT0C->cd(iCentr+1);
+            TH1D *hTmpSumPsi2B_CentFT0C = (TH1D*) hSumPsi2B_CentFT0C->ProjectionY(Form("hTmpSumPsi2B_CentFT0C_%d", iCentr), iCentr+1, iCentr+1);
             SetHist(hTmpSumPsi2B_CentFT0C, kBlack, 20);
+            hPsi2Bs_CentFT0C[iCentr] = (TH1D*) hTmpSumPsi2B_CentFT0C->Clone(Form("hPsi2Bs_CentFT0C_%d_%d", minCentrs[iCentr], maxCentrs[iCentr]));
+            SetHist(hPsi2Bs_CentFT0C[iCentr], kBlue+1, 24, 0.5);
             hTmpSumPsi2B_CentFT0C->Draw("EP");
         }
 
         TCanvas *canvasPsi2C_CentFT0C = new TCanvas("canvasPsi2C_CentFT0C", "", 1800, 1800);
         canvasPsi2C_CentFT0C->Divide(3, 3);
 
-        for (int iCent = 0;iCent < 9;iCent++) {
-            canvasPsi2C_CentFT0C->cd(iCent+1);
-            TH1D *hTmpSumPsi2C_CentFT0C = (TH1D*) hSumPsi2C_CentFT0C->ProjectionY(Form("hTmpSumPsi2C_CentFT0C_%d", iCent), iCent+1, iCent+1);
+        for (int iCentr = 0;iCentr < 9;iCentr++) {
+            canvasPsi2C_CentFT0C->cd(iCentr+1);
+            TH1D *hTmpSumPsi2C_CentFT0C = (TH1D*) hSumPsi2C_CentFT0C->ProjectionY(Form("hTmpSumPsi2C_CentFT0C_%d", iCentr), iCentr+1, iCentr+1);
             SetHist(hTmpSumPsi2C_CentFT0C, kBlack, 20);
+            hPsi2Cs_CentFT0C[iCentr] = (TH1D*) hTmpSumPsi2C_CentFT0C->Clone(Form("hPsi2Cs_CentFT0C_%d_%d", minCentrs[iCentr], maxCentrs[iCentr]));
+            SetHist(hPsi2Cs_CentFT0C[iCentr], kGreen+1, 24, 0.5);
             hTmpSumPsi2C_CentFT0C->Draw("EP");
         }
+
+        // Produced comparison plot for different detectors
+        TLatex *latexTitle = new TLatex();
+        latexTitle->SetTextSize(0.045);
+        latexTitle->SetNDC();
+        latexTitle->SetTextFont(42);
+
+        TLegend *legend = new TLegend(0.45,0.30,0.65,0.50);
+        SetLegend(legend);
+        legend->AddEntry(hPsi2As_CentFT0C[0],"TPC","PL");
+        legend->AddEntry(hPsi2Bs_CentFT0C[0],"FT0C","PL");
+        legend->AddEntry(hPsi2Cs_CentFT0C[0],"FT0A","PL");
+        legend->Draw();
+
+        TCanvas *canvasPsi2All_CentFT0C = new TCanvas("canvasPsi2All_CentFT0C", "", 1800, 1800);
+        canvasPsi2All_CentFT0C->Divide(3, 3);
+        for (int iCentr = 0;iCentr < 9;iCentr++) {
+            gStyle->SetOptStat(false);
+            canvasPsi2All_CentFT0C->cd(iCentr+1);
+            hPsi2As_CentFT0C[iCentr]->GetXaxis()->SetTitle("#Psi_{2}");
+            hPsi2As_CentFT0C[iCentr]->GetYaxis()->SetRangeUser(0, 0.020);
+            hPsi2As_CentFT0C[iCentr]->Draw("EP");
+            hPsi2Bs_CentFT0C[iCentr]->Draw("EP SAME");
+            hPsi2Cs_CentFT0C[iCentr]->Draw("EP SAME");
+            legend->Draw("SAME");
+            latexTitle->DrawLatex(0.65, 0.85, Form("FTOC centrality %d#minus%d%%", minCentrs[iCentr], maxCentrs[iCentr]));
+        }
+        canvasPsi2All_CentFT0C->SaveAs(Form("%s/figures/Psi2ABC_CentFT0C.pdf", pathIn.c_str()));
 
         TCanvas *canvasPt = DoPlot(hSumPt, "canvasPt", "#it{p}_{T} (GeV/#it{c})");
         TCanvas *canvasEta = DoPlot(hSumEta, "canvasEta", "#eta");
