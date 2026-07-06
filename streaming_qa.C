@@ -127,6 +127,9 @@ TCanvas* DoRatioPlot(TH1D *histSum, std::vector<TH1D*> hist, string canvasName, 
 
 void streaming_qa(string train = "686270", string process = "table-maker", string production = "minBias") {
     gStyle->SetPalette(kRainBow);
+    // /Users/lucamicheletti/cernbox/JPSI/Jpsi_flow/LHC25ae/train_698032/
+    // /Users/lucamicheletti/cernbox/DQ_streaming/train_698032/
+    //string pathIn = Form("/Users/lucamicheletti/cernbox/JPSI/Jpsi_flow/LHC25ae/train_%s", train.c_str());
     string pathIn = Form("/Users/lucamicheletti/cernbox/DQ_streaming/train_%s", train.c_str());
     string muonCutTm = "muonMinimalCuts10SigmaPDCA";
     string muonCutTr = "muonQualityCutsMUONStandalone";
@@ -294,13 +297,13 @@ void streaming_qa(string train = "686270", string process = "table-maker", strin
         TCanvas *canvasPsi2B_CentFT0C = nullptr;
         TCanvas *canvasPsi2C_CentFT0C = nullptr;
         if (production == "heavyIon") {
-            hSumPsi2A_CentFT0C->RebinX(5);
-            hSumPsi2B_CentFT0C->RebinX(5);
-            hSumPsi2C_CentFT0C->RebinX(5);
+            hSumPsi2A_CentFT0C->RebinX(10);
+            hSumPsi2B_CentFT0C->RebinX(10);
+            hSumPsi2C_CentFT0C->RebinX(10);
             for (int iRun = 0;iRun < nRuns;iRun++) {
-                hPsi2A_CentFT0C[iRun]->RebinX(5);
-                hPsi2B_CentFT0C[iRun]->RebinX(5);
-                hPsi2C_CentFT0C[iRun]->RebinX(5);
+                hPsi2A_CentFT0C[iRun]->RebinX(10);
+                hPsi2B_CentFT0C[iRun]->RebinX(10);
+                hPsi2C_CentFT0C[iRun]->RebinX(10);
             }
 
             canvasPsi2A_CentFT0C = new TCanvas("canvasPsi2A_CentFT0C", "", 1800, 1800);
@@ -434,9 +437,9 @@ void streaming_qa(string train = "686270", string process = "table-maker", strin
         int minCentrs[] = {0, 10, 20, 30, 40, 50, 60, 70, 80};
         int maxCentrs[] = {10, 20, 30, 40, 50, 60, 70, 80, 90};
 
-        hSumPsi2A_CentFT0C->RebinX(5);
-        hSumPsi2B_CentFT0C->RebinX(5);
-        hSumPsi2C_CentFT0C->RebinX(5);
+        hSumPsi2A_CentFT0C->RebinX(10);
+        hSumPsi2B_CentFT0C->RebinX(10);
+        hSumPsi2C_CentFT0C->RebinX(10);
 
         std::vector<TH1D*> hPsi2As_CentFT0C(9);
         std::vector<TH1D*> hPsi2Bs_CentFT0C(9);
@@ -491,9 +494,9 @@ void streaming_qa(string train = "686270", string process = "table-maker", strin
         legend->AddEntry(hPsi2Cs_CentFT0C[0],"FT0A","PL");
         legend->Draw();
 
-        TCanvas *canvasPsi2All_CentFT0C = new TCanvas("canvasPsi2All_CentFT0C", "", 1800, 1800);
-        canvasPsi2All_CentFT0C->Divide(3, 3);
-        for (int iCentr = 0;iCentr < 9;iCentr++) {
+        TCanvas *canvasPsi2All_CentFT0C = new TCanvas("canvasPsi2All_CentFT0C", "", 1800, 1200);
+        canvasPsi2All_CentFT0C->Divide(3, 2);
+        for (int iCentr = 0;iCentr < 6;iCentr++) {
             gStyle->SetOptStat(false);
             canvasPsi2All_CentFT0C->cd(iCentr+1);
             hPsi2As_CentFT0C[iCentr]->GetXaxis()->SetTitle("#Psi_{2}");
@@ -502,7 +505,7 @@ void streaming_qa(string train = "686270", string process = "table-maker", strin
             hPsi2Bs_CentFT0C[iCentr]->Draw("EP SAME");
             hPsi2Cs_CentFT0C[iCentr]->Draw("EP SAME");
             legend->Draw("SAME");
-            latexTitle->DrawLatex(0.65, 0.85, Form("FTOC centrality %d#minus%d%%", minCentrs[iCentr], maxCentrs[iCentr]));
+            latexTitle->DrawLatex(0.50, 0.85, Form("FTOC centrality %d#minus%d%%", minCentrs[iCentr], maxCentrs[iCentr]));
         }
         canvasPsi2All_CentFT0C->SaveAs(Form("%s/figures/Psi2ABC_CentFT0C.pdf", pathIn.c_str()));
 

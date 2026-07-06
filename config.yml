@@ -1,11 +1,17 @@
 
 input:
-    output_dir_name: "/Users/lucamicheletti/cernbox/DQ_streaming/train_678568"
-    alien_run_list: /Users/lucamicheletti/GITHUB/dq_run3_analyses/utils/alien_run_list.txt
-    alien_input_path: /Users/lucamicheletti/GITHUB/dq_run3_analyses/utils/alien_input_path.txt
+    #output_dir_name: "/Users/lucamicheletti/cernbox/DQ_streaming/train_686033/reader"
+    #output_dir_name: "/Users/lucamicheletti/cernbox/JPSI/Jpsi_flow/LHC25ae/train_687739"
+    output_dir_name: "/Users/lucamicheletti/cernbox/DQ_streaming/train_701085"
+    #output_dir_name: "/Users/lucamicheletti/cernbox/JPSI/Jpsi_flow/LHC25ae/train_698024"
+    alien_run_list: alien_run_list.txt
+    alien_input_path: alien_input_path.txt
 
     file_type: "AnalysisResults.root"
-    file_path: "/Users/lucamicheletti/cernbox/DQ_streaming/train_678568"
+    #file_path: "/Users/lucamicheletti/cernbox/DQ_streaming/train_686033/reader"
+    #file_path: "/Users/lucamicheletti/cernbox/JPSI/Jpsi_flow/LHC25ae/train_687739"
+    file_path: "/Users/lucamicheletti/cernbox/DQ_streaming/train_701085"
+    #file_path: "/Users/lucamicheletti/cernbox/JPSI/Jpsi_flow/LHC25ae/train_698024"
     table_maker_stat: table-maker/Statistics
     table_maker: table-maker/output
     table_maker_dir: ["Muons_muonQualityCuts"]
