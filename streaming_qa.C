@@ -33,8 +33,8 @@ void SetLegend(TLegend *legend){
     legend->SetTextFont(42);
     legend->SetTextSize(0.045);
 }
-void SetHist(TH1D *hist, Color_t color, int size, double alpha = 1) {
-    hist->SetMarkerStyle(size);
+void SetHist(TH1D *hist, Color_t color, int style, double alpha = 1) {
+    hist->SetMarkerStyle(style);
     hist->SetMarkerColorAlpha(color, alpha);
     hist->SetMarkerSize(0.5);
     hist->SetLineColorAlpha(color, alpha);
@@ -125,15 +125,16 @@ TCanvas* DoRatioPlot(TH1D *histSum, std::vector<TH1D*> hist, string canvasName, 
 // process: table-maker / table-reader
 // production: minBias / skimmed / heavyIon
 
-void streaming_qa(string train = "686270", string process = "table-maker", string production = "minBias") {
+void streaming_qa(string train = "686270", string process = "table-maker", string production = "minBias", bool skipFlow = true) {
     gStyle->SetPalette(kRainBow);
     // /Users/lucamicheletti/cernbox/JPSI/Jpsi_flow/LHC25ae/train_698032/
     // /Users/lucamicheletti/cernbox/DQ_streaming/train_698032/
     //string pathIn = Form("/Users/lucamicheletti/cernbox/JPSI/Jpsi_flow/LHC25ae/train_%s", train.c_str());
-    string pathIn = Form("/Users/lucamicheletti/cernbox/DQ_streaming/train_%s", train.c_str());
+    //string pathIn = Form("/Users/lucamicheletti/cernbox/DQ_streaming/train_%s", train.c_str());
+    string pathIn = Form("/Users/lucamicheletti/GITHUB/dq_streaming_qa/streaming_request/train_%s", train.c_str());
     string muonCutTm = "muonMinimalCuts10SigmaPDCA";
     string muonCutTr = "muonQualityCutsMUONStandalone";
-    string histBlock = "Mass_Pt_centrFT0C_V2";
+    string histBlock = "Mass_Pt_Cent_Rap"; // Mass_Pt_centrFT0C_V2, Mass_Pt_Cent_Rap
     string triggerMask = "fSingleMuLow";
 
     TH1D *hSumVtxZ, *hSumCentFT0C, *hSumCentFT0M;
@@ -402,9 +403,11 @@ void streaming_qa(string train = "686270", string process = "table-maker", strin
         hSumVtxZ = (TH1D*) listTrEvents->FindObject("VtxZ");
         hSumCentFT0C = (TH1D*) listTrEvents->FindObject("CentFT0C");
         hSumCentFT0M = (TH1D*) listTrEvents->FindObject("CentFT0M");
-        hSumPsi2A_CentFT0C = (TH2D*) listTrEvents->FindObject("Psi2A_CentFT0C");
-        hSumPsi2B_CentFT0C = (TH2D*) listTrEvents->FindObject("Psi2B_CentFT0C");
-        hSumPsi2C_CentFT0C = (TH2D*) listTrEvents->FindObject("Psi2C_CentFT0C");
+        if (!skipFlow) {
+            hSumPsi2A_CentFT0C = (TH2D*) listTrEvents->FindObject("Psi2A_CentFT0C");
+            hSumPsi2B_CentFT0C = (TH2D*) listTrEvents->FindObject("Psi2B_CentFT0C");
+            hSumPsi2C_CentFT0C = (TH2D*) listTrEvents->FindObject("Psi2C_CentFT0C");
+        }
 
         TList *hlistTrMuons = (TList*) fIn->Get("analysis-muon-selection/output");
         TList *listTrMuons = (TList*) hlistTrMuons->FindObject(Form("TrackMuon_%s", muonCutTr.c_str()));
@@ -432,83 +435,83 @@ void streaming_qa(string train = "686270", string process = "table-maker", strin
         TCanvas *canvasCentFT0C = DoPlot(hSumCentFT0C, "canvasCentFT0C", "Centr FT0C (%)");
         TCanvas *canvasCentFT0M = DoPlot(hSumCentFT0M, "canvasCentFT0M", "Centr FT0M (%)");
 
-
-        // Rebin EP distribution
-        int minCentrs[] = {0, 10, 20, 30, 40, 50, 60, 70, 80};
-        int maxCentrs[] = {10, 20, 30, 40, 50, 60, 70, 80, 90};
-
-        hSumPsi2A_CentFT0C->RebinX(10);
-        hSumPsi2B_CentFT0C->RebinX(10);
-        hSumPsi2C_CentFT0C->RebinX(10);
-
-        std::vector<TH1D*> hPsi2As_CentFT0C(9);
-        std::vector<TH1D*> hPsi2Bs_CentFT0C(9);
-        std::vector<TH1D*> hPsi2Cs_CentFT0C(9);
-
         TCanvas *canvasPsi2A_CentFT0C = new TCanvas("canvasPsi2A_CentFT0C", "", 1800, 1800);
-        canvasPsi2A_CentFT0C->Divide(3, 3);
-
-        for (int iCentr = 0;iCentr < 9;iCentr++) {
-            canvasPsi2A_CentFT0C->cd(iCentr+1);
-            TH1D *hTmpSumPsi2A_CentFT0C = (TH1D*) hSumPsi2A_CentFT0C->ProjectionY(Form("hTmpSumPsi2A_CentFT0C_%d", iCentr), iCentr+1, iCentr+1);
-            SetHist(hTmpSumPsi2A_CentFT0C, kBlack, 20);
-            hPsi2As_CentFT0C[iCentr] = (TH1D*) hTmpSumPsi2A_CentFT0C->Clone(Form("hPsi2As_CentFT0C_%d_%d", minCentrs[iCentr], maxCentrs[iCentr]));
-            SetHist(hPsi2As_CentFT0C[iCentr], kRed+1, 20);
-            hTmpSumPsi2A_CentFT0C->Draw("EP");
-        }
-
         TCanvas *canvasPsi2B_CentFT0C = new TCanvas("canvasPsi2B_CentFT0C", "", 1800, 1800);
-        canvasPsi2B_CentFT0C->Divide(3, 3);
-
-        for (int iCentr = 0;iCentr < 9;iCentr++) {
-            canvasPsi2B_CentFT0C->cd(iCentr+1);
-            TH1D *hTmpSumPsi2B_CentFT0C = (TH1D*) hSumPsi2B_CentFT0C->ProjectionY(Form("hTmpSumPsi2B_CentFT0C_%d", iCentr), iCentr+1, iCentr+1);
-            SetHist(hTmpSumPsi2B_CentFT0C, kBlack, 20);
-            hPsi2Bs_CentFT0C[iCentr] = (TH1D*) hTmpSumPsi2B_CentFT0C->Clone(Form("hPsi2Bs_CentFT0C_%d_%d", minCentrs[iCentr], maxCentrs[iCentr]));
-            SetHist(hPsi2Bs_CentFT0C[iCentr], kBlue+1, 24, 0.5);
-            hTmpSumPsi2B_CentFT0C->Draw("EP");
-        }
-
         TCanvas *canvasPsi2C_CentFT0C = new TCanvas("canvasPsi2C_CentFT0C", "", 1800, 1800);
-        canvasPsi2C_CentFT0C->Divide(3, 3);
+        if (!skipFlow) {
+            // Rebin EP distribution
+            int minCentrs[] = {0, 10, 20, 30, 40, 50, 60, 70, 80};
+            int maxCentrs[] = {10, 20, 30, 40, 50, 60, 70, 80, 90};
 
-        for (int iCentr = 0;iCentr < 9;iCentr++) {
-            canvasPsi2C_CentFT0C->cd(iCentr+1);
-            TH1D *hTmpSumPsi2C_CentFT0C = (TH1D*) hSumPsi2C_CentFT0C->ProjectionY(Form("hTmpSumPsi2C_CentFT0C_%d", iCentr), iCentr+1, iCentr+1);
-            SetHist(hTmpSumPsi2C_CentFT0C, kBlack, 20);
-            hPsi2Cs_CentFT0C[iCentr] = (TH1D*) hTmpSumPsi2C_CentFT0C->Clone(Form("hPsi2Cs_CentFT0C_%d_%d", minCentrs[iCentr], maxCentrs[iCentr]));
-            SetHist(hPsi2Cs_CentFT0C[iCentr], kGreen+1, 24, 0.5);
-            hTmpSumPsi2C_CentFT0C->Draw("EP");
+            hSumPsi2A_CentFT0C->RebinX(10);
+            hSumPsi2B_CentFT0C->RebinX(10);
+            hSumPsi2C_CentFT0C->RebinX(10);
+
+            std::vector<TH1D*> hPsi2As_CentFT0C(9);
+            std::vector<TH1D*> hPsi2Bs_CentFT0C(9);
+            std::vector<TH1D*> hPsi2Cs_CentFT0C(9);
+
+            canvasPsi2A_CentFT0C->Divide(3, 3);
+
+            for (int iCentr = 0;iCentr < 9;iCentr++) {
+                canvasPsi2A_CentFT0C->cd(iCentr+1);
+                TH1D *hTmpSumPsi2A_CentFT0C = (TH1D*) hSumPsi2A_CentFT0C->ProjectionY(Form("hTmpSumPsi2A_CentFT0C_%d", iCentr), iCentr+1, iCentr+1);
+                SetHist(hTmpSumPsi2A_CentFT0C, kBlack, 20);
+                hPsi2As_CentFT0C[iCentr] = (TH1D*) hTmpSumPsi2A_CentFT0C->Clone(Form("hPsi2As_CentFT0C_%d_%d", minCentrs[iCentr], maxCentrs[iCentr]));
+                SetHist(hPsi2As_CentFT0C[iCentr], kRed+1, 20);
+                hTmpSumPsi2A_CentFT0C->Draw("EP");
+            }
+
+            canvasPsi2B_CentFT0C->Divide(3, 3);
+
+            for (int iCentr = 0;iCentr < 9;iCentr++) {
+                canvasPsi2B_CentFT0C->cd(iCentr+1);
+                TH1D *hTmpSumPsi2B_CentFT0C = (TH1D*) hSumPsi2B_CentFT0C->ProjectionY(Form("hTmpSumPsi2B_CentFT0C_%d", iCentr), iCentr+1, iCentr+1);
+                SetHist(hTmpSumPsi2B_CentFT0C, kBlack, 20);
+                hPsi2Bs_CentFT0C[iCentr] = (TH1D*) hTmpSumPsi2B_CentFT0C->Clone(Form("hPsi2Bs_CentFT0C_%d_%d", minCentrs[iCentr], maxCentrs[iCentr]));
+                SetHist(hPsi2Bs_CentFT0C[iCentr], kBlue+1, 24, 0.5);
+                hTmpSumPsi2B_CentFT0C->Draw("EP");
+            }
+
+            canvasPsi2C_CentFT0C->Divide(3, 3);
+
+            for (int iCentr = 0;iCentr < 9;iCentr++) {
+                canvasPsi2C_CentFT0C->cd(iCentr+1);
+                TH1D *hTmpSumPsi2C_CentFT0C = (TH1D*) hSumPsi2C_CentFT0C->ProjectionY(Form("hTmpSumPsi2C_CentFT0C_%d", iCentr), iCentr+1, iCentr+1);
+                SetHist(hTmpSumPsi2C_CentFT0C, kBlack, 20);
+                hPsi2Cs_CentFT0C[iCentr] = (TH1D*) hTmpSumPsi2C_CentFT0C->Clone(Form("hPsi2Cs_CentFT0C_%d_%d", minCentrs[iCentr], maxCentrs[iCentr]));
+                SetHist(hPsi2Cs_CentFT0C[iCentr], kGreen+1, 24, 0.5);
+                hTmpSumPsi2C_CentFT0C->Draw("EP");
+            }
+
+            // Produced comparison plot for different detectors
+            TLatex *latexTitle = new TLatex();
+            latexTitle->SetTextSize(0.045);
+            latexTitle->SetNDC();
+            latexTitle->SetTextFont(42);
+
+            TLegend *legend = new TLegend(0.45,0.30,0.65,0.50);
+            SetLegend(legend);
+            legend->AddEntry(hPsi2As_CentFT0C[0],"TPC","PL");
+            legend->AddEntry(hPsi2Bs_CentFT0C[0],"FT0C","PL");
+            legend->AddEntry(hPsi2Cs_CentFT0C[0],"FT0A","PL");
+            legend->Draw();
+
+            TCanvas *canvasPsi2All_CentFT0C = new TCanvas("canvasPsi2All_CentFT0C", "", 1800, 1200);
+            canvasPsi2All_CentFT0C->Divide(3, 2);
+            for (int iCentr = 0;iCentr < 6;iCentr++) {
+                gStyle->SetOptStat(false);
+                canvasPsi2All_CentFT0C->cd(iCentr+1);
+                hPsi2As_CentFT0C[iCentr]->GetXaxis()->SetTitle("#Psi_{2}");
+                hPsi2As_CentFT0C[iCentr]->GetYaxis()->SetRangeUser(0, 0.020);
+                hPsi2As_CentFT0C[iCentr]->Draw("EP");
+                hPsi2Bs_CentFT0C[iCentr]->Draw("EP SAME");
+                hPsi2Cs_CentFT0C[iCentr]->Draw("EP SAME");
+                legend->Draw("SAME");
+                latexTitle->DrawLatex(0.50, 0.85, Form("FTOC centrality %d#minus%d%%", minCentrs[iCentr], maxCentrs[iCentr]));
+            }
+            canvasPsi2All_CentFT0C->SaveAs(Form("%s/figures/Psi2ABC_CentFT0C.pdf", pathIn.c_str()));
         }
-
-        // Produced comparison plot for different detectors
-        TLatex *latexTitle = new TLatex();
-        latexTitle->SetTextSize(0.045);
-        latexTitle->SetNDC();
-        latexTitle->SetTextFont(42);
-
-        TLegend *legend = new TLegend(0.45,0.30,0.65,0.50);
-        SetLegend(legend);
-        legend->AddEntry(hPsi2As_CentFT0C[0],"TPC","PL");
-        legend->AddEntry(hPsi2Bs_CentFT0C[0],"FT0C","PL");
-        legend->AddEntry(hPsi2Cs_CentFT0C[0],"FT0A","PL");
-        legend->Draw();
-
-        TCanvas *canvasPsi2All_CentFT0C = new TCanvas("canvasPsi2All_CentFT0C", "", 1800, 1200);
-        canvasPsi2All_CentFT0C->Divide(3, 2);
-        for (int iCentr = 0;iCentr < 6;iCentr++) {
-            gStyle->SetOptStat(false);
-            canvasPsi2All_CentFT0C->cd(iCentr+1);
-            hPsi2As_CentFT0C[iCentr]->GetXaxis()->SetTitle("#Psi_{2}");
-            hPsi2As_CentFT0C[iCentr]->GetYaxis()->SetRangeUser(0, 0.020);
-            hPsi2As_CentFT0C[iCentr]->Draw("EP");
-            hPsi2Bs_CentFT0C[iCentr]->Draw("EP SAME");
-            hPsi2Cs_CentFT0C[iCentr]->Draw("EP SAME");
-            legend->Draw("SAME");
-            latexTitle->DrawLatex(0.50, 0.85, Form("FTOC centrality %d#minus%d%%", minCentrs[iCentr], maxCentrs[iCentr]));
-        }
-        canvasPsi2All_CentFT0C->SaveAs(Form("%s/figures/Psi2ABC_CentFT0C.pdf", pathIn.c_str()));
-
         TCanvas *canvasPt = DoPlot(hSumPt, "canvasPt", "#it{p}_{T} (GeV/#it{c})");
         TCanvas *canvasEta = DoPlot(hSumEta, "canvasEta", "#eta");
         TCanvas *canvasPhi = DoPlot(hSumPhi, "canvasPhi", "#varphi");
@@ -516,15 +519,33 @@ void streaming_qa(string train = "686270", string process = "table-maker", strin
         TCanvas *canvasRAtAbsorberEnd = DoPlot(hSumRAtAbsorberEnd, "canvasRAtAbsorberEnd", "R_{abs}");
         TCanvas *canvasChi2MCHMID = DoPlot(hSumChi2MCHMID, "canvasChi2MCHMID", "#chi^{2}_{MCH-MID}");
 
+        canvasVtxZ->SaveAs(Form("%s/VtxZ.pdf", pathIn.c_str()));
+        canvasCentFT0C->SaveAs(Form("%s/CentFT0C.pdf", pathIn.c_str()));
+        canvasCentFT0M->SaveAs(Form("%s/CentFT0M.pdf", pathIn.c_str()));
+        canvasPt->SaveAs(Form("%s/Pt.pdf", pathIn.c_str()));
+        canvasEta->SaveAs(Form("%s/Eta.pdf", pathIn.c_str()));
+        canvasPhi->SaveAs(Form("%s/Phi.pdf", pathIn.c_str()));
+        canvaspdca->SaveAs(Form("%s/pdca.pdf", pathIn.c_str()));
+        canvasRAtAbsorberEnd->SaveAs(Form("%s/RAtAbsorberEnd.pdf", pathIn.c_str()));
+        canvasChi2MCHMID->SaveAs(Form("%s/Chi2MCHMID.pdf", pathIn.c_str()));
+
         TFile *fOut = new TFile(Form("%s/QA.root", pathIn.c_str()), "RECREATE");
         hCounters->Write();
         hDimuonMass->Write("hDimuonMass");
+        hSumPt->Write("hPt");
+        hSumEta->Write("hEta");
+        hSumPhi->Write("hPhi");
+        hSumpdca->Write("hPdca");
+        hSumRAtAbsorberEnd->Write("hRabs");
+        hSumChi2MCHMID->Write("hChi2MCHMID");
         canvasVtxZ->Write();
         canvasCentFT0C->Write();
         canvasCentFT0M->Write();
-        canvasPsi2A_CentFT0C->Write();
-        canvasPsi2B_CentFT0C->Write();
-        canvasPsi2C_CentFT0C->Write();
+        if (!skipFlow) {
+            canvasPsi2A_CentFT0C->Write();
+            canvasPsi2B_CentFT0C->Write();
+            canvasPsi2C_CentFT0C->Write();
+        }
         canvasPt->Write();
         canvasEta->Write();
         canvasPhi->Write();
