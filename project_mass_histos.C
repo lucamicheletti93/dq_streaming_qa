@@ -18,10 +18,10 @@ void SetLegend(TLegend *legend){
 
 void project_mass_histos(double minPt = 0, double maxPt = 20) {
     string label = "LHC26ac_pass1_skimmed";
-    string fInName = "streaming_request/train_797807/AnalysisResults.root";
+    string fInName = "streaming_request/train_801453/AnalysisResults.root";
     //string label = "LHC26ak_apass1";
     //string fInName = "tag_comparison/AnalysisResults_LHC26ak_apass1.root";
-    string fOutName = Form("streaming_request/train_797807/dimuMass_pt_%1.0f_%1.0f_%s.root", minPt, maxPt, label.c_str());
+    string fOutName = Form("streaming_request/train_801453/dimuMass_pt_%2.1f_%2.1f_%s.root", minPt, maxPt, label.c_str());
     //string fOutName = Form("tag_comparison/dimuMass_pt_%1.0f_%1.0f_%s.root", minPt, maxPt, label.c_str());
     string muonCutTr = "muonQualityCutsMUONStandalone"; // matchedMchMid, muonQualityCutsMUONStandalone muonLowPt210SigmaPDCA
     string histBlock = "Mass_Pt_Cent_Rap"; // Mass_Pt_Cent_Rap Mass_Pt_Rapidity
@@ -37,6 +37,47 @@ void project_mass_histos(double minPt = 0, double maxPt = 20) {
 
     TFile *fOut = new TFile(fOutName.c_str(), "RECREATE");
     hDimuonMass->Write("hDimuonMass");
+    fOut->Close();
+}
+
+void run_projections() {
+    double minPt[] = {0.0, 0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 10.0, 12.0, 15.0, 10.0};
+    double maxPt[] = {20.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 10.0, 12.0, 15.0, 20.0, 20.0};
+
+    string label = "LHC26ac_pass1_skimmed";
+    string fInName = "streaming_request/train_801453/AnalysisResults.root";
+    string fOutName = Form("streaming_request/train_801453/dimuMass_%s.root", label.c_str());
+    //string fOutName = Form("tag_comparison/dimuMass_pt_%1.0f_%1.0f_%s.root", minPt, maxPt, label.c_str());
+    string muonCutTr = "muonQualityCutsMUONStandalone"; // matchedMchMid, muonQualityCutsMUONStandalone muonLowPt210SigmaPDCA
+    string histBlock = "Mass_Pt_Cent_Rap"; // Mass_Pt_Cent_Rap Mass_Pt_Rapidity
+        
+    TFile *fIn = new TFile(fInName.c_str(), "READ");
+
+    TFile *fOut = new TFile(fOutName.c_str(), "RECREATE");
+    for (int i = 0; i < sizeof(minPt)/sizeof(minPt[0]); i++) {
+        std::cout << minPt[i] << " - " << maxPt[i] << std::endl;
+        //project_mass_histos(minPt[i], maxPt[i]);
+
+        ////////////
+        TList *hlistTrDimuons = (TList*) fIn->Get("analysis-same-event-pairing/output");
+        TList *listTrDimuons = (TList*) hlistTrDimuons->FindObject(Form("PairsMuonSEPM_%s", muonCutTr.c_str()));
+        TList *listTrDimuonsUnamb = (TList*) hlistTrDimuons->FindObject(Form("PairsMuonSEPM_unambiguous_%s", muonCutTr.c_str()));
+        THnSparseD *hSparseDimuon = (THnSparseD*) listTrDimuons->FindObject(histBlock.c_str());
+        THnSparseD *hSparseDimuonUnamb = (THnSparseD*) listTrDimuonsUnamb->FindObject(histBlock.c_str());
+
+        hSparseDimuon->GetAxis(1)->SetRangeUser(minPt[i], maxPt[i]);
+        hSparseDimuon->GetAxis(3)->SetRangeUser(2.5, 4); // switch to 2 in case of Mass_Pt_Rapidity
+        TH1D *hDimuonMass = (TH1D*) hSparseDimuon->Projection(0, Form("hDimuonMass_pt_%2.1f_%2.1f", minPt[i], maxPt[i]));
+
+        hSparseDimuonUnamb->GetAxis(1)->SetRangeUser(minPt[i], maxPt[i]);
+        hSparseDimuonUnamb->GetAxis(3)->SetRangeUser(2.5, 4); // switch to 2 in case of Mass_Pt_Rapidity
+        TH1D *hDimuonMassUnamb = (TH1D*) hSparseDimuonUnamb->Projection(0, Form("hDimuonMassUnamb_pt_%2.1f_%2.1f", minPt[i], maxPt[i]));
+
+        fOut->cd();
+        hDimuonMass->Write(Form("hDimuonMass_pt_%2.1f_%2.1f", minPt[i], maxPt[i]));
+        hDimuonMassUnamb->Write(Form("hDimuonMassUnamb_pt_%2.1f_%2.1f", minPt[i], maxPt[i]));
+        ////////////
+    }
     fOut->Close();
 }
 
