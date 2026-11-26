@@ -41,15 +41,18 @@ void project_mass_histos(double minPt = 0, double maxPt = 20) {
 }
 
 void run_projections() {
-    double minPt[] = {0.0, 0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 10.0, 12.0, 15.0, 10.0};
-    double maxPt[] = {20.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 10.0, 12.0, 15.0, 20.0, 20.0};
+    //double minPt[] = {0.0, 0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 10.0, 12.0, 15.0, 10.0};
+    //double maxPt[] = {20.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 10.0, 12.0, 15.0, 20.0, 20.0};
+
+    double minPt[] = {0.0, 0.0, 2.0, 5.0};
+    double maxPt[] = {20.0, 2.0, 5.0, 10.0};
 
     string label = "LHC26ac_pass1_skimmed";
-    string fInName = "streaming_request/train_801453/AnalysisResults.root";
-    string fOutName = Form("streaming_request/train_801453/dimuMass_%s.root", label.c_str());
+    string fInName = "streaming_request/train_806703/AnalysisResults.root";
+    string fOutName = Form("streaming_request/train_806703/dimuHighMass_%s.root", label.c_str());
     //string fOutName = Form("tag_comparison/dimuMass_pt_%1.0f_%1.0f_%s.root", minPt, maxPt, label.c_str());
     string muonCutTr = "muonQualityCutsMUONStandalone"; // matchedMchMid, muonQualityCutsMUONStandalone muonLowPt210SigmaPDCA
-    string histBlock = "Mass_Pt_Cent_Rap"; // Mass_Pt_Cent_Rap Mass_Pt_Rapidity
+    string histBlock = "Mass_Pt_Rapidity"; // Mass_Pt_Cent_Rap Mass_Pt_Rapidity
         
     TFile *fIn = new TFile(fInName.c_str(), "READ");
 
@@ -66,11 +69,19 @@ void run_projections() {
         THnSparseD *hSparseDimuonUnamb = (THnSparseD*) listTrDimuonsUnamb->FindObject(histBlock.c_str());
 
         hSparseDimuon->GetAxis(1)->SetRangeUser(minPt[i], maxPt[i]);
-        hSparseDimuon->GetAxis(3)->SetRangeUser(2.5, 4); // switch to 2 in case of Mass_Pt_Rapidity
+        if (histBlock == "Mass_Pt_Rapidity") {
+            hSparseDimuon->GetAxis(2)->SetRangeUser(2.5, 4); // switch to 2 in case of Mass_Pt_Rapidity
+        } else {
+            hSparseDimuon->GetAxis(3)->SetRangeUser(2.5, 4);
+        }
         TH1D *hDimuonMass = (TH1D*) hSparseDimuon->Projection(0, Form("hDimuonMass_pt_%2.1f_%2.1f", minPt[i], maxPt[i]));
 
         hSparseDimuonUnamb->GetAxis(1)->SetRangeUser(minPt[i], maxPt[i]);
-        hSparseDimuonUnamb->GetAxis(3)->SetRangeUser(2.5, 4); // switch to 2 in case of Mass_Pt_Rapidity
+        if (histBlock == "Mass_Pt_Rapidity") {
+            hSparseDimuonUnamb->GetAxis(2)->SetRangeUser(2.5, 4); // switch to 2 in case of Mass_Pt_Rapidity
+        } else {
+            hSparseDimuonUnamb->GetAxis(3)->SetRangeUser(2.5, 4);
+        }
         TH1D *hDimuonMassUnamb = (TH1D*) hSparseDimuonUnamb->Projection(0, Form("hDimuonMassUnamb_pt_%2.1f_%2.1f", minPt[i], maxPt[i]));
 
         fOut->cd();
